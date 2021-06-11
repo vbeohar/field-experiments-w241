@@ -1,0 +1,184 @@
+# 5. A Final Practice Problem 
+
+Now for a fictional scenario. An emergency two-week randomized controlled trial of the experimental drug ZMapp is conducted to treat Ebola. (The control represents the usual standard of care for patients identified with Ebola, while the treatment is the usual standard of care plus the drug.) 
+
+Here are the (fake) data. 
+
+```{r read data}
+d <- fread("../data/ebola_rct2.csv")
+head(d)
+```
+
+You are asked to analyze it. Patients' temperature and whether they are dehydrated is recorded on day 0 of the experiment, then ZMapp is administered to patients in the treatment group on day 1. Dehydration and temperature is again recorded on day 14.
+
+
+1. Without using any covariates, answer this question with regression: What is the estimated effect of ZMapp (with standard error in parentheses) on whether someone was dehydrated on day 14? What is the p-value associated with this estimate?
+
+```{r dehydration model}
+mod_1 <-  d[ , lm(dehydrated_day14 ~ treat_zmapp)]
+coeftest(mod_1, vcov. = mod_1$vcovHC_)
+```
+
+> We use robust standard errors to estimate the effect of ZMapp. The estimated effect of using ZMapp is `r round(coeftest(mod_1, vcov. = mod_1$vcovHC_)[2,1], digits = 4)`, which means there is an overall reduction in 14th day temperature. The standard error estimated by the model is `r round(coeftest(mod_1, vcov. = mod_1$vcovHC_)[2,2], digits = 4)`.
+
+> We see that probability of effect this size if the sharp null were true i.e. the p-value, is `r round(coeftest(mod_1, vcov. = mod_1$vcovHC_)[2,4], digits = 5) * 100`%, this is evidence to say treatment is effective.
+
+
+
+2. Add covariates for dehydration on day 0 and patient temperature on day 0 to the regression from part (a) and report the ATE (with standard error). Also report the p-value.
+
+```{r add pre-treatment measures}
+mod_2 <-  d[ , lm(dehydrated_day14 ~ treat_zmapp  + dehydrated_day0 + temperature_day0)]
+mod_2$vcovHC_ <- vcovHC(mod_2)
+coeftest(mod_2, vcov. = mod_2$vcovHC_)
+```
+
+    * ATE `r round(coeftest(mod_2, vcov. = mod_2$vcovHC_)[2,1], digits = 4)`
+    * Standard error `r round(coeftest(mod_2, vcov. = mod_2$vcovHC_)[2,2], digits = 4)`
+    * p-value `r round(coeftest(mod_2, vcov. = mod_2$vcovHC_)[2,4], digits = 4) * 100`%
+
+
+
+3. Do you prefer the estimate of the ATE reported in part (a) or part (b)? Why? Report the results of the F-test that you used to form this opinion. 
+
+```{r test pre-treatment variable inclusion}
+test_object <- anova(mod_1, mod_2, test='F')
+
+test_object
+```
+
+> We conduct an F-test on models 1 and 2, and find p-value of the f-test as `r test_object[2,6]`, which indicates that the means between both models are significantly different (and that the group of variables in 2nd model are jointly significant). We prefer model 2 because it is better to add these pre-treatment covariates. This gives model 2 much more explanatory power. 
+
+
+
+4. The regression from part (2) suggests that temperature is highly predictive of dehydration. Add, temperature on day 14 as a covariate and report the ATE, the standard error, and the p-value.
+
+```{r add pre-treatment temperature}
+mod_3 <-  d[ , lm(dehydrated_day14 ~ treat_zmapp  + 
+                    dehydrated_day0 + temperature_day0 + temperature_day14)]
+mod_3$vcovHC_ <- vcovHC(mod_3)
+coeftest(mod_3, vcov. = mod_3$vcovHC_)[1:5, ]
+
+```
+
+    * ATE `r round(coeftest(mod_3, vcov. = mod_3$vcovHC_)[2,1], digits = 4)`
+    * Standard error `r round(coeftest(mod_3, vcov. = mod_3$vcovHC_)[2,2], digits = 4)`
+    * p-value `r round(coeftest(mod_3, vcov. = mod_3$vcovHC_)[2,4], digits = 4) * 100`%
+
+
+
+5. Do you prefer the estimate of the ATE reported in part (b) or part (d)? What is this preference based on? 
+
+> We prefer part b (5.2) because adding temperature_day14 is a bad control (this is affected by the treatment itself) and should not be included as explanatory variable in the model. 
+
+
+
+
+6. Now let's switch from the outcome of dehydration to the outcome of temperature, and use the same regression covariates as in the chunk titled `add pre-treatment measures`. Test the hypothesis that ZMapp is especially likely to reduce mens' temperatures, as compared to womens', and describe how you did so. What do the results suggest?
+
+```{r heterogeneous treatment effects}
+# mod_4 <-  d[ , lm(temperature_day14 ~ treat_zmapp  + 
+      #temperature_day0 + dehydrated_day0  + 
+      #I(male =='0') + (I(male =='0') * treat_zmapp) )]
+
+mod_4 <-  d[ , lm(temperature_day14 ~ treat_zmapp  + 
+                    temperature_day0 + dehydrated_day0  + 
+                    male + (male * treat_zmapp) )]
+
+mod_4$vcovHC_ <- vcovHC(mod_4)
+
+stargazer(mod_4,
+          type = 'text', 
+          se = list(mod_4$robust.se),
+          add.lines = list(
+            c('SE Flavor','Robust')
+            ),
+          column.labels = c("Model 4 - HTE"), 
+          model.numbers=FALSE,
+          header=F 
+          )
+
+
+```
+
+> We see that the new model, does show a different heterogeneous treatment effect for males (male * zmapp), leading to a statistically significant reduction in temperature when a treatment is administered for males (male == 1).
+
+> The stargazer output shows that the ATE for treatment for females (male == 0) is -0.231. However, for males, the HTE is -2.077 (p-value < 0.01). Which means that for males, the treatment should lead to a -2 degree reduction in day 14 temperature.
+
+> Better treatment effects for males, but worse outcomes for men nevertheless (perhaps because the disease hits males harder).
+
+
+
+
+7. Which group -- those that are coded as `male == 0` or `male == 1` have better health outcomes in control? What about in treatment? How does this help to contextualize whatever heterogeneous treatment effect you might have estimated? 
+
+```{r}
+d[, mean(temperature_day14), by=.(male, treat_zmapp)]
+```
+
+> The above code block shows that in control (treat_zmapp == 0), males (male == 1) have on an average 2 degrees higher temperature than females. This confirms with our findings with model 4 from 5.6 above where we see that the male (male ==1) indicator has a coefficient of 3.085, indicating a higher baseline average temperature for males. 
+
+> Therefore, in control, females have a better outcome as opposed to males. 
+
+```{r context for hte}
+
+# mod_male <- d[ male != 0 , lm(temperature_day14 ~ 
+#       treat_zmapp  + temperature_day0 + dehydrated_day0 )]
+# mod_female <- d[ male == 0 , lm(temperature_day14 ~ 
+#       treat_zmapp  + temperature_day0 + dehydrated_day0 )]
+
+# creating dummy prediction data - with 100F baseline temp for all 
+prediction_data_frame <- data.table(
+  id = 1:8, 
+  male               = c(0, 0, 0, 0, 1, 1, 1, 1),
+  dehydrated_day0    = c(1, 1, 0, 0, 1, 1, 0, 0),
+  treat_zmapp        = c(1, 0, 1, 0, 1, 0, 1, 0),
+  temperature_day0  =  c(100,   100,   100,   100,  100,  100,  100, 100)
+
+)
+
+prediction_data_frame[, pred := predict(
+  mod_4, newdata = prediction_data_frame  )]
+
+# displaying predicted outcomes
+prediction_data_frame
+
+```
+
+> We run predictions to prove the treatment effects on zmap on males and females. We run our prediction with a universal baseline temperature of 100F for all males and females and present results above. 
+
+```{r}
+# displaying means of predicted outcomes
+prediction_data_frame[, mean(pred), by=.(male, treat_zmapp)]
+```
+
+> Finally, as shown above in summary, we see that the treatment effect on males has lead to an overall reduction in temperature by 2F. Therefore, we prove that the treatment has worked in reducing average temperatures in males (thus proving HTE of -2.077 for males)
+
+
+
+
+8. Suppose that you had not run the regression in part (7). Instead, you speak with a colleague to learn about heterogeneous treatment effects. This colleague has access to a non-anonymized version of the same dataset and reports that they looked at heterogeneous effects of the ZMapp treatment by each of 80 different covariates to examine whether each predicted the effectiveness of ZMapp on each of 20 different indicators of health. Across these regressions your colleague ran, the treatment's interaction with gender on the outcome of temperature is the only heterogeneous treatment effect that he found to be statistically significant. They reason that this shows the importance of gender for understanding the effectiveness of the drug, because nothing else seemed to indicate why it worked. Bolstering your colleague's confidence, after looking at the data, they also returned to his medical textbooks and built a theory about why ZMapp interacts with processes only present in men to cure. Another doctor, unfamiliar with the data, hears your colleague's theory and finds it plausible. How likely do you think it is ZMapp works especially well for curing Ebola in men, and why? (This question is conceptual can be answered without performing any computation.)
+
+> This is a multiple-comparisons problem because the colleague tried their fishing expedition on as many variables and specifications; exhausting all possible covariates until they got statistical significant results on the coefficients they liked. Although some amount of searching is inevitable, but a result obtained out of a fishing expedition like this (on 80 covariates, on 20 different indicators) seems more like a coincidence rather than an actual discovery of truth. Therefore, it is likely that the statistical significance obtained on the ZMapp treatment on men is without merit and not true.
+
+
+
+9. Now, imagine that your colleague's fishing expedition did not happen, but that you had tested this heterogeneous treatment effect, and only this heterogeneous treatment effect, of your own accord. Would you be more or less inclined to believe that the heterogeneous treatment effect really exists? Why?
+
+> If an independent investigation is performed only on the heterogenous treatment effect of ZMapp and gender - with no influence from the colleague's fishing expedition, then we are inclined to believe the results of our independently performed regression analysis. 
+
+
+
+10. Now, imagine that your colleague's fishing expedition **did** happen, but that you on your own tested this and only this HTE, discover a positive result and conclude there is an effect. How does your colleague's behavior change the interpretation of your test? Does this seem fair or reasonable?
+
+> In this scenario, we are performed our own analysis first and then fishing expedition comes later. It is plausible that we could get influenced by the fishing expedition and get involved in a multiple-comparisions issue. Hence we would need to do the following to corroborate and validate our experiment: 
+
+> Need someone who is not involved with the fishing expedition and validate our test
+
+> State our hypothesis a-priori and then test our model only on that hypothesis, not to pick and choose the hypotheses we like 
+
+> Implement conservative validation techniques by controlling the family-wise error rate (FWER) using techniques like like Bonferroni correction or Holm's method to avoid overstating statistical significance. 
+
+> Controlling false-discovery rate -- by allowing more false positives and,
+
+> Using Bayesian solutions by sufficiently modeling the relationships between corresponding parameters of the model from the beginning

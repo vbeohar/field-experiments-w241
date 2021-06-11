@@ -1,0 +1,65 @@
+---
+title: 'Experiments and Causality: Problem Set #4 (Vaibhav Beohar/MIDS/Spring 2021)'
+author: "Alex, Scott & Micah"
+date: "12/9/2020"
+output: pdf_document
+---
+
+---
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r global-options, include=TRUE}
+options(digits = 5)
+```
+
+
+```{r, message=FALSE}
+# install.packages("kableExtra")
+# install.packages("ivreg")
+# install.packages("ri2")
+# install.packages("tidyverse")
+# install.packages("ivreg")
+# install.packages("stargazer")
+# install.packages("sandwich")
+# install.packages("ghostcript")
+
+library(ri2)
+library(stats) 
+library(tidyverse)
+require(lmtest)
+require(sandwich)
+library(data.table)
+library(stargazer)
+library(tinytex)
+
+library(ivreg)
+library(kableExtra)
+library(dplyr)
+
+library(sandwich)
+library(lmtest)
+library(stargazer)
+library(dplyr)
+
+```
+
+
+
+```{r, child='./questions/question_1.Rmd'}
+```
+
+```{r, child='./questions/question_2.Rmd'}
+```
+
+```{r, child='./questions/question_3.Rmd'}
+```
+
+```{r, child='./questions/question_4.Rmd'}
+```
+
+```{r, child='./questions/question_5.Rmd'}
+```
+

@@ -1,0 +1,223 @@
+---
+output:
+  pdf_document: default
+  html_document: default
+---
+# 3. Turnout in Dorms
+
+Guan and Green report the results of a canvassing experiment conduced in Beijing on the eve of a local election. Students on the campus of Peking University were randomly assigned to treatment or control groups. 
+
+- Canvassers attempted to contact students in their dorm rooms and encourage them to vote. 
+- No contact with the control group was attempted. 
+- Of the 2,688 students assigned to the treatment group, 2,380 were contacted. 
+- A total of 2,152 students in the treatment group voted; of the 1,334 students assigned to the control group, 892 voted. 
+- One aspect of this experiment threatens to violate the exclusion restriction. At every dorm room they visited, even those where no one answered, canvassers left a leaflet encouraging students to vote. 
+
+```{r, message=FALSE}
+```
+
+
+```{r read dorm data}
+d <- fread('https://ucb-mids-w241.s3-us-west-1.amazonaws.com/Guan_Green_CPS_2006.csv')
+head(d)
+```
+
+```{r}
+# Custom function to calculate and return clustered std errors
+clustered_se <- function(mod){
+  mod$vcovCL_ <- NULL
+  mod$vcovCL_ <- vcovCL(mod, cluster = d[, dormid])
+  return(sqrt(diag(mod$vcovCL_)))
+}
+```
+
+
+
+Here are definitions for what is in that data: 
+
+- `turnout` did the person turn out to vote?
+- `treated` did someone at the dorm open the door? 
+- `dormid` a unique ID for the door of the dorm
+- `treatment_group` whether the dorm door was assigned to be treated or not
+
+## Use Linear Regressions 
+
+1. Estimate the ITT using a linear regression on the appropriate subset of data. Notice that there are two `NA` in the data. Just na.omit to remove these rows so that we are all working with the same data. Given the ways that randomization was conducted, what is the appropriate way to construct the standard errors? 
+
+```{r dorm itt}
+d <- na.omit(d)
+dorm_model <- lm(turnout ~ treatment_group, data = d) 
+
+#Print out the model summary with clustered std errors
+coeftest(dorm_model, vcov = vcovCL(dorm_model, d$dormid))[2:1,]
+
+#Print out descriptive model summary with clustered std errors
+stargazer(
+          dorm_model, 
+          se = list(clustered_se(dorm_model)[2]), 
+          type='text',
+          add.lines =list(c('SE Flavor','Clustered')),
+          column.labels = c("dorm_model"),
+          header = F
+          )
+
+```
+
+We see that the treatment assignment was done at the student level, with students at each dorm room being assigned to the treatment or control (and hence clustering happening at the dorm room level and randomization assignment happening at the clustered dorm room level). Therefore it is appropriate to have clustered standard errors here, as a measure of standard error.
+
+## Use Randomization Inference  
+
+1. How many people are in treatment and control? Does this give you insight into how the scientists might have randomized? As ususal, include a narrative setence after your code.   
+
+```{r people in treatment} 
+# Here we calculate absolute number of people in treatment and control
+n_treatment <- d[treatment_group == 1, .N]
+n_control <- d[treatment_group == 0, .N]
+
+n_treatment
+n_control
+
+```
+Total number of people in treatment: `r n_treatment`
+
+Total number of people in control  : `r n_control`
+
+We see a roughly 2:1 randomization ratio for treatment and control (`r n_treatment / n_control` to be precise using formula `n_treatment/ n_control`)
+
+2. Write an algorithm to conduct the Randomization Inference. Be sure to take into account the fact that random assignment was clustered by dorm room.
+
+```{r dorm room randomization inference}
+
+# We use ri2 package as an efficient way of implemeting randomization inference. 
+
+# STEPS:
+# First we define the experiment in the declaration
+# Then we pass on hyperparameters along with the experiment design (declaration) 
+# in the 2nd step (ri2_out_ate)
+
+# We also illustrate a method of running custom formula (code commented) to 
+# show how ri2 package can be used to provide various statistics on 
+# a custom formula 
+
+# Here we get total number of clusters for treatment and control
+n_treatment_cluster <- d[treatment_group == 1, .N, by=dormid][, .N]
+n_control_cluster <- d[treatment_group == 0, .N, by=dormid][, .N]
+
+# Declare the type of design we need for our experiment in the ri2 package
+declaration <- 
+  with(d,{
+    declare_ra(
+      clusters = dormid,
+      m_each = c(n_treatment_cluster, n_control_cluster))
+  })
+
+# Print out the design of the experiment here (FOR DEBUGGING)
+# note the probability of assignment of clusters for treatment and control 
+declaration
+
+# Finally running randomization inference for 10000 steps using sharp_null_hyp = 0
+ri2_out_ate <- conduct_ri(
+  formula =  d[, lm(turnout ~ treatment_group)],
+  assignment = "treatment_group",
+  sharp_hypothesis = 0, # means we assume there is no effect of treatment
+  declaration = declaration, # passing model design here
+  data = d,
+  sims = 10000, # running for 10000 simulations,
+  progress_bar = TRUE
+)
+
+# Below code commented: but could be used (IN A SIMILAR PROJECT SETTING) 
+# for returning a custom statistic (such as standard error)
+# for a given formula (using ri2)
+# stderr_fun <- function(data) {
+#      model <- lm(turnout ~ treatment_group, data = d)
+#      se <- sqrt(diag(vcovCL(model)))[2]
+#      names(se) <- NULL
+#      return(se)
+# }
+# 
+# stderr_fun(d)
+# 
+# ri2_out_stderr <- conduct_ri(
+#   test_function = stderr_fun,
+#   assignment = "treatment_group",
+#   sharp_hypothesis = 0, 
+#   declaration = declaration, 
+#   data = d,
+#   sims = 1000, 
+#   progress_bar = TRUE
+# )
+
+plot(ri2_out_ate)
+summary(ri2_out_ate, p = "two-tailed")
+```
+  
+  
+  
+3. What is the value that you estimate for the treatment effect?
+
+```{r dorm room ATE}
+dorm_room_ate <- summary(ri2_out_ate, p = "two-tailed")[2]
+dorm_room_ate
+```
+
+We get an estimate of the treatment effect from the RI process as: `r dorm_room_ate` (using the formula: `summary(ri2_out_ate, p = "two-tailed")[2]`)
+  
+  
+4. What are the 2.5% and 97.5% quantiles of this distribution? 
+
+```{r dorm room ri CI}
+dorm_room_ci <- quantile(ri2_out_ate$sims_df[, 1], prob = c(0.025, 0.975))
+dorm_room_ci
+```
+  
+5. What is the p-value that you generate for the test: How likely is this treatment effect to have been generated if the sharp null hypothesis were true. 
+  
+```{r dorm room ri p-value}
+p_value <- summary(ri2_out_ate, p = "two-tailed")[3]
+p_value
+```
+
+The likelihood of treatment effect to have been generated if the sharp null hypothesis were true is the p-value of `r p_value` calculated in the above section.
+
+6. Assume that the leaflet (which was left in case nobody answered the door) had no effect on turnout. Estimate the CACE either using ITT and ITT_d or using a set of linear models. What is the CACE, the estimated standard error of the CACE, and the p-value of the test you conduct?  
+  
+```{r dorm room cace}
+#Calculating CACE using 2SLS (ivreg) and displaying results:
+dorm_room_cace <- d[, ivreg(turnout ~ treated, ~ treatment_group)]
+dorm_room_cace$coefficients[2]
+
+#Clustered standard errors of the CACE: 
+clustered_se(dorm_room_cace)[2]
+
+#p-value of the CACE
+summary(dorm_room_cace)$coefficients[2,4]
+
+# Finally, displaying model summary:
+stargazer(
+          dorm_room_cace, 
+          se = list(clustered_se(dorm_room_cace)[2]
+            #sqrt(diag(vcovHC(dorm_room_cace, type = 'HC0')))
+            ), 
+          type='text',
+          add.lines =list(c('SE Flavor','Clustered')),
+          column.labels = c("dorm_room_cace"),
+          header = F
+          )
+
+```  
+We conduct a two-stage least square regression test to find the CACE of our experiment. 
+
+CACE: `r dorm_room_cace$coefficients[2]`
+
+Clustered Standard Error of the CACE: `r clustered_se(dorm_room_cace)[2]`
+
+P-value: `r summary(dorm_room_cace)$coefficients[2,4]`
+
+  
+7. What if the leaflet that was left actually *did* have an effect? Is it possible to estimate a CACE in this case? Why or why not? 
+
+If dropping a leaflet had an effect, this would mean that dropping a leaflet was equal to providing treatment to those subjects where we dropped those leaflets. 
+Therefore, we would have essentially provided treatment to all those who were assigned treatment. This would imply that there was no one with left without compliance (and equal to knocking on all doors and finding all those assigned to treatment and giving them the same treatment). 
+
+Thus in this case, with 100% compliance, CACE (or the complier ATE) would equal to ITT. Therefore calculating CACE in this case would be equal to calculating ITT.

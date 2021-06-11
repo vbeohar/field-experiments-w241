@@ -1,0 +1,234 @@
+# 4. Now! Do it with data 
+Download the data set for the recycling study in the previous problem, obtained from the authors. We'll be focusing on the outcome variable Y="number of bins turned in per week" (avg_bins_treat).
+
+
+```{r}
+d <- foreign::read.dta("../data/karlan_data_subset_for_class.dta")
+d <- data.table(d)
+head(d)
+
+## Do some quick exploratory data analysis with this data. 
+## There are some values in this data that seem a bit strange. 
+
+## Determine what these are. 
+## Don't make an assessment about keeping, changing, or 
+## dropping just yet, but at any point that your analysis touches 
+## these variables, you'll have to determine what is appropriate 
+## given the analysis you are conducting. 
+```
+```{r}
+calculate_conf_int <- function(mod){
+  return(coefci(mod, vcov. = vcovHC)[2,] * 100)
+}
+
+robust_se <- function(mod){
+  cov1  <- vcovHC(mod, type = "HC1")
+  return(sqrt(diag(cov1)))
+}
+```
+
+
+
+
+1. For simplicity, let's start by measuring the effect of providing a recycling bin, ignoring the SMS message treatment (and ignoring whether there was a sticker on the bin or not).  Run a regression of Y on only the bin treatment dummy, so you estimate a simple difference in means.  Provide a 95% confidence interval for the treatment effect, using **of course** robust standard errors (use these throughout). 
+
+```{r estimate basic model}
+
+# just to be consistent with the paper
+mod_1 <- d[, lm(avg_bins_treat ~ bin)]
+mod_1$vcovHC_ <- vcovHC(mod_1)
+
+#showing robust standard errors
+robust_se(mod_1)
+
+#showing confidence interval using robust SE
+calculate_conf_int(mod_1)
+```
+
+> 95% confidence interval for the treatment effect is  `r calculate_conf_int(mod_1)`
+
+
+
+2. Now add the pre-treatment value of Y as a covariate.  Provide a 95% confidence interval for the treatment effect.  Explain how and why this confidence interval differs from the previous one.
+
+```{r add pre-treatment values}
+mod_2 <- d[!is.na(street),lm(avg_bins_treat ~ bin + base_avg_bins_treat)]
+
+#showing confidence interval using robust SE
+calculate_conf_int(mod_2)
+```
+
+> 95% confidence interval for the treatment effect for this updated model is is  `r calculate_conf_int(mod_2)`
+
+> This model should also estimate similar treatment effect (as the prior model). However, by adding new covariate, the confidence interval of the treatment effect should get narrow (as it happens in this case).
+
+> NOTE: we are removing NA's from model 2, because further down the code, we intend on matching model 4 (with street effects) and model 2 using ANOVA (and would like to have same data rows in both models)
+
+
+
+3. Now add the street fixed effects.  (You'll need to use the R command factor().) Provide a 95% confidence interval for the treatment effect.  
+
+```{r add fixed effects}
+mod_3 <- d[!is.na(street), lm(avg_bins_treat ~ bin + 
+                                base_avg_bins_treat + as.factor(street))]
+
+#showing confidence interval using robust SE for model 3 treatment effect
+calculate_conf_int(mod_3)
+
+```
+
+> 95% confidence interval for the treatment effect for our 3rd model (with fixed street effects) is  `r calculate_conf_int(mod_3)`
+
+
+
+4. Recall that the authors described their experiment as "stratified at the street level," which is a synonym for blocking by street.  Does including these block fixed effects change the standard errors of the estimates *very much*? Conduct the appropriate test for the inclusion of these block fixed effects, and interpret them in the context of the other variables in the regression. 
+
+```{r fixed effects model} 
+mod_4 <- d[!is.na(street),lm(avg_bins_treat ~ bin + 
+                               base_avg_bins_treat + as.factor(street))]
+```
+
+```{r test for fixed effects}
+stargazer(mod_1, mod_2, mod_4,
+          type = 'text', 
+          se = list(
+                    robust_se(mod_1),
+                    robust_se(mod_2),
+                    robust_se(mod_4)),
+          add.lines = list(
+            c('SE Flavor','Robust', 'Robust', 'Robust'),
+            c('Street fixed effects', 'No', 'No', 'Yes')
+            ),
+          omit = 'street',
+          model.numbers=FALSE,
+          column.labels = c("Model 1", "Model 2", "Model 4"), 
+          header=F 
+          )
+
+
+# Running F-test on models 2 vs. 4 to check for statistically significant differences in parameters
+test_fixed_effects <- anova(mod_2, mod_4, test='F')
+test_fixed_effects
+```
+
+
+> As seen in the stargazer output, we are comparing models 1, 2 and 4 --- and can observe that the standard errors of the estimates only slightly change (after adding the block fixed effects) -- even after we use robust standard errors in our stargazer package. 
+
+> Comparing models 2 and 4 using ANOVA and running an F-test, we get very low p-value of `r test_fixed_effects[2,6]` which means that there is significant difference between the residuals of both models at the 5% and 1% significance levels. Since the only difference between both models is the addition of street fixed effects in model 4 (which are statistically significant), we find that the fixed effects and other group of variables in model 4 are jointly significant.
+
+> Therefore, we can infer that adding the addition set of covariates (i.e. fixed street effects in model 4) improves our results further. The coefficient of treatment effect is getting more precise, and hence model explanability increases.
+
+> In general block randomization at street level should reduce variance of treatment effects because it reduces the chance of lot of similar households at different parts of town getting clubbed together in treatment or control. This is what the street fixed effect is also doing here, because here we are taking the grouped-mean effect of households at same-street as an average coefficient; hence ultimately reducing the variance of treatment effect a.k.a. reducing "dirty variation" in the treatment variable (similar to block randomization).
+
+
+
+5. Perhaps having a cell phone helps explain the level of recycling behavior. Instead of "has cell phone," we find it easier to interpret the coefficient if we define the variable " no cell phone."  Give the R command to define this new variable, which equals one minus the "has cell phone" variable in the authors' data set.  Use "no cell phone" instead of "has cell phone" in subsequent regressions with this dataset.
+
+```{r feature engineering mid-analysis (dont do this IRL!)}
+d[, nocell:= 1 - havecell]
+```
+
+
+
+6. Now add "no cell phone" as a covariate to the previous regression.  Provide a 95% confidence interval for the treatment effect.  Explain why this confidence interval does not differ much from the previous one.
+
+```{r add cell-phone variable}
+mod_5 <- d[ , lm(avg_bins_treat ~ bin + base_avg_bins_treat + 
+                   nocell + as.factor(street))]
+
+# printing confidence interval as asked
+calculate_conf_int(mod_5)
+
+#printing detailed model-by-model comparison for convenience
+stargazer(mod_2, mod_4, mod_5,
+        type = 'text', 
+        se = list(
+                  robust_se(mod_2),
+                  robust_se(mod_4),
+                  robust_se(mod_5)),
+        add.lines = list(
+          c('SE Flavor','Robust', 'Robust', 'Robust'),
+          c('Street fixed effects', 'No', 'Yes', 'Yes')
+          ),
+        omit = 'street',
+        model.numbers=FALSE,
+        column.labels = c("Model 2", "Model 4", "Model 5"), 
+        header=F 
+        )
+
+```
+
+> 95% confidence interval for the treatment effect for model 5 (after adding no-cell covariate) is  `r calculate_conf_int(mod_5)`. Model 4 gave us a confidence interval of `r calculate_conf_int(mod_4)`.
+
+> We don't see a significant reduction in confidence intervals even after adding the additional "no cell phone" covariate because the confidence interval of the treatment effect is already quite significant at the 1% significance level. 
+
+> Addition of new covariate is not adding further statistical power to the test. The `base_avg_bins_treat` variable already bakes in historical recycling measures related to a lot of confounding factors. Hence adding a new covariate (which is perhaps correlated to `base_avg_bins_treat`) doesnt add much statistical precision or power to our model. 
+
+
+
+7. Now let's add in the SMS treatment.  Re-run the previous regression with "any SMS" included.  You should get the same results as in Table 4A.  Provide a 95% confidence interval for the treatment effect of the recycling bin.  Explain why this confidence interval does not differ much from the previous one.
+
+```{r add sms treatment}
+mod_6 <- d[ , lm(avg_bins_treat ~ bin + sms + nocell + 
+                   base_avg_bins_treat + as.factor(street))]
+
+stargazer(mod_6,
+        type = 'text', 
+        se = list(
+                  robust_se(mod_6)),
+        add.lines = list(
+          c('SE Flavor','Robust'),
+          c('Street fixed effects', 'Yes')
+          ),
+        omit = 'street',
+        model.numbers=FALSE,
+        column.labels = c("Model 6"), 
+        header=F 
+        )
+
+
+calculate_conf_int(mod_6)
+
+
+```
+
+> We see that adding `sms` doesn't reduce confidence intervals for the treatment effect. This seems to be a design flaw in the experiment. We know that in linear models past performance metrics are always best predictors of future results. Hence adding the `base_avg_bins_treat` has had the most impact on the regression. Furthermore, it is possible that the sms covariate is correlated to the `base_avg_bins_treat` variable. `base_avg_bins_treat` is thus encompassing various endogenous relationships with other covariates including household affluence, ownership of gadgets such as cell phones etc; which ultimately provide a rough measure of how much a given household recycles on average.
+
+> This can also be illustrated by the model results which indicate a p-value of `0.022` for the `sms` variable (which is not statistical significant at the 5% significance level).
+
+
+
+8. Now reproduce the results of column 2 in Table 4B, estimating separate treatment effects for the two types of SMS treatments and the two types of recycling-bin treatments.  Provide a 95% confidence interval for the effect of the unadorned recycling bin.  Explain how your answer differs from that in part (g), and explain why you think it differs.
+
+```{r full model}
+mod_7 <- d[ , lm(avg_bins_treat ~ bin_g + bin_s + 
+                   sms_p + sms_g + nocell + 
+                   base_avg_bins_treat + as.factor(street))]
+
+#providing confidence interval for all treatments and covariates
+coefci(mod_7, vcov. = vcovHC)[1:8,]
+
+#providing a stargazer analysis to match the study (using robust SE)
+stargazer(mod_7,
+        type = 'text', 
+        se = list(
+                  robust_se(mod_7)),
+        add.lines = list(
+          c('SE Flavor','Robust'),
+          c('Street fixed effects', 'Yes')
+          ),
+        omit = 'street',
+        model.numbers=FALSE,
+        column.labels = c("Model 7"), 
+        header=F 
+        )
+
+```
+
+> We see from the stargazer results that both `bin_s` and `bin_g` treatment effects are statistically significant. However, from the F-test provided in the study, for a null hypothesis `bin_s` and `bin_g` being different -- we see that the difference between both treatment effects is not statistically significant. 
+
+> Hence the final outcome of treatment effect, as a collective measure of providing bin to customers should be the generic `bin` indicator. We cannot say with confidence that either of the two treatments (`bin with sticker` or `bin without sticker`) is more effective than the other. 
+
+> Therefore, from this analysis we should expect the confidence interval of the generic `bin` indicator (from model 6) should lie in between the confidence intervals of the `bin_s` and `bin_g` treatment indicators. Which we can confirm is the case here. 
+
+

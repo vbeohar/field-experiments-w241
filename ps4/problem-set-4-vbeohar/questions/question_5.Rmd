@@ -1,0 +1,23 @@
+---
+output:
+  pdf_document: default
+  html_document: default
+---
+# Consider Designs 
+
+Determine the direction of bias in estimating the ATE for each of the following situations when we randomize at the individual level.  Do we over-estimate, or underestimate? Briefly but clearly explain your reasoning.
+
+1. Suppose that you're advertising games -- Among Us? -- to try and increase sales, and you individually randomly-assign people into treatment and control. After you randomize, you learn that some treatment-group members are friends with control-group members IRL. 
+
+Here we have a situation of violation of non-intereference assumtpion, leading to spillover effects between treatment and control. 
+
+Even though the treatment group only receives advertisement, the effects of those ads from treated folks spill over to the control group folks via word of mouth. Therefore, this will be a spillover to control and result underestimation (reduction) of ATE resulting in negative bias (because treatment and control both become similar).
+
+
+2. As we're writing this question, end-of-year bonuses are being given out in people's companies. (This is not a concept we have in the program -- each day with your smiling faces is reward enough -- and who needs money anyways?) Suppose that you're interested in knowing whether this is a good idea from the point of view of worker productivity and so you agree to randomly assign bonuses to some people. *What might happen to your estimated treatment effects if people learn about the bonuses that others have received?* 
+
+In this instance, an argument can be made in both ways. However we argue that this type experiment can causes positive spillovers with underestimation of ATE.
+
+Overestimation of ATE: The leakage of HR bonus information is taken as an incentive based bonus (by the other employees, who have not received this bonus), this will likely deincentivize the workers in the control group (those who havent received bonuses), causing them to be less-motivated and less-productive; thus further widening the gap between control and treatment worker productivity. This creates a further positive direction bias for the estimated ATE leading to overestimation of ATE (difference grows between treatment and control worker productivity).
+
+Underestimate of ATE: Control group members learn about the bonus incentive treatment and think that this must be perhaps because of the higher productive nature of those folks who received the bonuses (in the treatment group). This could lead to control group members being extra motivated. At the same time, treatment group members are now extra motivated because of their new bonus. Leading to higher worker producitivities in both ends, leading to underestimation of ATE (because, now both treatment and control groups are closer to each other in worker productivity levels).  

@@ -1,0 +1,17 @@
+# Randomization and Experiments 
+
+1. Assume that researcher takes a random sample of elementary school children and compare the grades of those who were previously enrolled in an early childhood education program with the grades of those who were not enrolled in such a program. Is this an experiment, an observational study, or something in between? Explain! \
+
+    **Answer:** This was an observational study. It  was essentially a survey that checked if children previously enrolled in an early childhood education program or not. The children were not randomly assigned to groups. This was effectively a survey of a sample of children without trying to affect them. Therefore, this was an observational study.\
+    
+    (In a controlled experiment, we assign people or things to groups and "apply some treatment" to one of the groups, while the other group does not receive the treatment)
+
+
+2. Assume that the researcher works together with an organization that provides early childhood education and offer free programs to certain children. However, which children that received this offer was not randomly selected by the researcher but rather chosen by the local government. (Assume that the government did not use random assignment but instead gives the offer to students who are deemed to need it the most) The research follows up a couple of years later by comparing the elementary school grades of students offered free early childhood education to those who were not. Is this an experiment, an observational study, or something in between? Explain! \
+
+    **Answer:** This is again an observation (or an example of an experimental study done very poorly). The intervention was not performed on random samples (i.e. children assigned to treatment and control groups by the government). \
+    Though we see that the intention here was to perform an experiment, it was however, an example of a poorly executed experiment because the children were not randomly assigned. Subjects were selected based on a possible economic criteria set by the government which could also have easily violated excludability and non-interference.
+
+3. Does your answer to part (2) change if we instead assume that the government assigned students to treatment and control by "coin toss" for each student? Why or why not?  \
+
+    **Answer:** This was an experiment. If children were assigned to treatment and control groups by a coin toss, that would mean the study would be a correctly performed experimental study. This is because the assignment to control and treament groups was random and not based on a criteria that could possibly introduce confounding factors. 

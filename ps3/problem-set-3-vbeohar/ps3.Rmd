@@ -1,0 +1,48 @@
+---
+title: 'Experiments and Causality: Problem Set 3'
+author: "Alex, Micah and Scott"
+date: "12/7/2020"
+output:
+  pdf_document: default
+  'pdf_document #github_document': default
+---
+```{r global-options, include=TRUE}
+options(digits = 3)
+```
+
+```{r, echo = F}
+library(knitr)
+opts_chunk$set(tidy.opts=list(width.cutoff=80),tidy=TRUE)
+```
+
+```{r load packages, warning=FALSE, message=FALSE}
+library(data.table)
+
+library(sandwich)
+library(lmtest)
+
+library(ggplot2)
+library(patchwork)
+
+library(foreign)
+library(knitr)
+
+library(stargazer)
+
+
+```
+
+```{r, child='./questions/question_1.Rmd'}
+```
+
+```{r, child='./questions/question_2.Rmd'}
+```
+
+```{r, child='./questions/question_3.Rmd'}
+```
+
+```{r, child='./questions/question_4.Rmd'}
+```
+
+```{r, child='./questions/question_5.Rmd'}
+```

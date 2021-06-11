@@ -1,0 +1,21 @@
+# Moral Panic 
+
+Suppose that a researcher finds that high school students who listen to death metal music at least once per week are more likely to perform badly on standardized test. :metal: As a consequence, the researcher writes an opinion piece in which she recommends parents to keep their kids away from "dangerous, satanic music". 
+
+- Let the potential outcomes to control, $Y_i(0)$, be each student's test score when listening to death metal at least one time per week. 
+- Let $Y_i(1)$ be the test score when listening to death metal less than one time per week. 
+
+1. Explain the statement $E[Y_i(0)|D_i=0] = E[Y_i(0)|D_i=1]$ in words. First, state the rote english language translation -- i.e. "The expected value of ..." -- but then, second, tell us the *meaning* of this statement. 
+
+    **Answer:** \ The expected value of untreated potential outcome for a randomly selected unit (student listening to death metal music at least once a week) in a hypothetical control group is equal to the expected value of untreated potential outcome of a randomly selected unit (student listening to death metal music at least once a week) in a hypothetically administered treatment group.
+
+    In other words, if we are randomly assigning units in treatment and control groups, then the potential outcomes for randomly selected units that do not receive treatment is independent of where those came from (either from control or treatment populations). Therefore, this further infers that the treatment status is statistically independent of the subjects' potential outcomes and their background attributes. 
+    
+    $Y_i(0), Y_i(1), X {\perp\!\!\!\perp} D_i$
+
+
+2. Do you expect that this circumstance actually matches with the meaning that you've just written down? Why or why not? 
+
+    **Answer:** \ The researcher has failed to perform an actual field experiment. The causal statement of students likely performing poorly as a result of listening to death metal music at least once a week is a mere observation. There is no evidence that there was an intervention of some sort. For all we know, those students who performed poorly could have simply chosen to listen to death metal music also. Hence there was no randomization. Further, the conditions of excludability and non-interference may also not hold true here. Hence we can deduce that the circumstances do not match the equality we described in the above section.
+
+

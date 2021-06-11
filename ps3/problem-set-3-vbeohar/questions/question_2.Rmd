@@ -1,0 +1,76 @@
+# 2. Peruvian Recycling 
+
+Look at [this article](./readings/recycling_peru.pdf) about encouraging recycling in Peru.  The paper contains two experiments, a "participation study" and a "participation intensity study."  In this problem, we will focus on the latter study, whose results are contained in Table 4 in this problem.  You will need to read the relevant section of the paper (starting on page 20 of the manuscript) in order to understand the experimental design and variables.  (*Note that "indicator variable" is a synonym for "dummy variable," in case you haven't seen this language before.*)
+
+1. In Column 3 of Table 4A, what is the estimated ATE of providing a recycling bin on the average weight of recyclables turned in per household per week, during the six-week treatment period?  Provide a 95% confidence interval.
+
+> ATE is the same as what is mentioned as the coefficient estimate by the model at `r 0.187`
+> Confidence interval `r (0.187+(2*0.032))` and `r (0.187-(2*0.032))`
+
+
+
+2. In Column 3 of Table 4A, what is the estimated ATE of sending a text message reminder on the average weight of recyclables turned in per household per week?  Provide a 95% confidence interval.
+
+> ATE is the same as what is mentioned as the coefficient estimate by the model at `r -0.024`
+> Confidence interval `r (-0.024+(2*0.039))` and `r (-0.024+(2*0.039))`
+
+
+
+3. Which outcome measures in Table 4A show statistically significant effects (at the 5% level) of providing a recycling bin?
+
+    * Percentage of visits turned in a bag
+    * Avg. no. of bins turned in per week
+    * Avg. weight (in kg) of recyclables turned in per week
+
+
+4. Which outcome measures in Table 4A show statistically significant effects (at the 5% level) of sending text messages?
+
+> None
+
+
+
+5. Suppose that, during the two weeks before treatment, household A turns in 2kg per week more recyclables than household B does, and suppose that both households are otherwise identical (including being in the same treatment group).  From the model, how much more recycling do we predict household A to have than household B, per week, during the six weeks of treatment?   Provide only a point estimate, as the confidence interval would be a bit complicated.  This question is designed to test your understanding of slope coefficients in regression.
+
+> $Y_{AB} = [\beta _{A1} B + \beta _{A2} S + \lambda Ybl_{A} + P_{A} + \alpha_{j} + \epsilon_{i}] - [\beta _{B1} B + \beta _{B2} S + \lambda Ybl_{j} + P_{B} + \alpha_{j} + \epsilon_{i}]$  represents the difference in model output for households A and B
+
+> $\alpha_{j}$ cancels out because of fixed street effects that are same for both households A and B
+
+> $\epsilon_{i}$ cancels out because experiments are randomized and observations are identical and independently distributed (i.i.d), hence we can assume error terms are homoskedastic (constant variance of error terms).
+
+> $B, S, P_{i}$ are indicator variables, hence cancel out between A and B households (as they are identical being in the same treatment groups)
+
+> Therefore, we only have difference in model prediction due to $\lambda Ybl_{AB}$ only.
+
+> Which can be calculated as 0.281 X 2 that comes to `r 0.281 * 2`
+
+
+
+
+6. Suppose that the variable "percentage of visits turned in bag, baseline" had been left out of the regression reported in Column 1.  What would you expect to happen to the results on providing a recycling bin?  Would you expect an increase or decrease in the estimated ATE?  Would you expect an increase or decrease in the standard error?  Explain our reasoning.
+
+> This will be an example of omitted variable bias. If this were an observational study, and we omitted baseline variable, its effects would influence Y only through the other independent variables present in the equation. Assuming that $\alpha.Ybl$ was positively correlated to the treatment variable (on providing a recycle bin). Hence, in this case, the effect of removing the baseline variable on the resuls of providing a recycle bin would have be an overstatement of effects on the latter.
+
+> However, this is an experimental study with randomized treatment assignment: With randomized treatment assignment, we know that treatment is uncorrelated with everything else: both observable covariates and unobservables we can't measure. So in an experiment, we don't have to worry about omitted variable bias, because we should get approximately the same answer no matter how many covariates we include. However, with additional explained covariates the standard error of the treatment effect variable shrinks, leading to higher certainty. 
+
+> Hence to summarize, missing the omitted baseline variable would have no impact on the coefficient of the treatment variable (providing a recycle bin), but would expand its standard error, leading to a reduction in the variables' significance. 
+
+
+
+7. In column 1 of Table 4A, would you say the variable "has cell phone" is a bad control?  Explain your reasoning.
+
+> Including `hascellphone` is not a bad control since it doesn't directly impact the dependent variable. This does seem to be a good control since it allows people to get the flyer treatment and help narrow the treatment variable slightly. 
+
+> However this probably represents a design flaw because `havecell` may indicate household affluence, which could directly or indirectly represent the wealth of a household, and therefore, their ability of buying recyclable good more than those households with no cell phone. 
+
+> Therefore as a final design thought, the designers of this experiment should have probably blocked the treatment of cell phone ownership. 
+
+
+
+8. If we were to remove the "has cell phone" variable from the regression, what would you expect to happen to the coefficient on "Any SMS message"?  Would it go up or down? Explain your reasoning.
+
+> On a theoritical standpoint, coefficients of a treatment effect (in this case `sms`) should not change with the adddition or removal or pre-treatment covariates (their standard errors can get tightened). Our recyclcing experiment is randomized, and hence there should be no relation between the coefficient of `sms` and `nocell`. 
+
+> However, is it possible that we may see increase in coefficient of `sms` treatment effect variable upon the removal of `nocell` covariate. We know that `nocell` covariate is statistically significant at the 5% confidence level. Hence removing this covariate will shift it's impact to some of the covariates. Additionally, `nocell` indicates a causal relationship between affluence and recycling (to a certain extent), therefore removing that covariate could shift some of it's causal interpretation to `sms` which is closely interlinked to someone owing a cell phone. 
+
+
+

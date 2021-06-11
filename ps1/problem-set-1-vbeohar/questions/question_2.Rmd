@@ -1,0 +1,41 @@
+# Potential Outcomes and Treatment Effects 
+
+```{r, include = FALSE}
+library(plyr)
+
+table <- data.table(
+  subject = 1:7, 
+  y_0 = c(10, 12, 15, 11, 10, 17, 16), 
+  y_1 = c(12, 12, 18, 14, 15, 18, 16),
+  tau = c(2, 0, 3, 3, 5, 1, 0)
+)
+
+```
+
+1. Use the values in the table below to illustrate that $E[Y_i(1)]-E[Y_i(0)] = E[Y_i(1)- [Y_i(0)]$.
+
+    **Answer:** \ Since we have a simple table of a small set of observations, we are here assuming that this is a sample of unbiased estimators of potential outcomes for the control and the treatment. The expected values is the mean of those properties. Here we are taking mean of each of the values. We also illustrate that the average treatment effect (mean Tau) is equal to the difference of the expected values of potential outcomes of treatment and control estimators.
+
+<!--
+R code practice: ways to calculate probability for each element in a dataframe: 
+table[,count_y_0 := .N, by="y_0"]
+table[,count_y_1 := .N, by="y_1"]
+table[,prob_y_0 := count_y_0 / length(y_0)]
+table[,prob_y_1 := count_y_1 / length(y_1)]
+table[, E_Y0 := y_0 * prob_y_0]
+table[, E_Y1 := y_1 * prob_y_1]
+-->
+
+```{r}
+mean(table$y_1) - mean(table$y_0)
+mean(table$y_1 - table$y_0)
+mean(table$tau)
+
+```
+
+  All shown here, both expressions equal to expected value of `2`.
+
+2. Is it possible to collect all necessary values and construct a table like the one below in real life? Explain why or why not. \
+    
+    **Answer:** \ It is not possible to construct a table of such values in real life because the potential outcome for each record is mutually exclusive in a population. We either treat a village or not. The only way to construct such a table would be to create a table by random selection from the population. A random selection would ensure that the control and treatment groups are unbiased estimators of the original population.
+

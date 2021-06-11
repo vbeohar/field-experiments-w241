@@ -1,0 +1,119 @@
+---
+output:
+  pdf_document: default
+  html_document: default
+---
+# 1. What happens when pilgrims attend the Hajj pilgrimage to Mecca? 
+
+What happens when a diverse set of people are brought together toward a common purpose? Maybe it brings people together, or maybe instead it highlights the differences between groups.  [Clingingsmith, Khwaja and Kremer (2009)](https://dash.harvard.edu/handle/1/3659699) investigate the question. by asking Pakistani nationals to provide information about their views about people from other nations. 
+
+The random assignment and data is collected in the following way (detailed in the paper): 
+
+- Pakistani nationals apply for a chance to attend the Hajj at a domestic bank. Saudi Arabia agreed in the time period of the study (2006) to grant 150,000 visas. 
+- Of the 135,000 people who applied for a visa, 59% of those who applied were successful. 
+- The remainder of the visas were granted under a different allocation method that was not randomly assigned, and so this experiment cannot provide causal evidence about other allocation mechanisms. 
+- Among the 135,000 who apply, the authors conduct a random sample and survey about these respondents views about others. 
+
+Using the data collected by the authors, test, using randomization infernece, whether there is a change in beliefs about others as a result of attending the Hajj. 
+
+- Use, as your primary outcome the `views` variable. This variable is a column-sum of each respondent's views toward members of other countries. 
+- Use, as your treatment feature `success`. This variable encodes whether the respondent successfully attended the Hajj. 
+
+```{r load hajj data }
+library(data.table)
+
+d <- fread("../data/clingingsmith_2009.csv")
+d <- data.table(d)
+d[success == 1, sum(success)]
+
+```
+
+##### 1. State the sharp-null hypothesis that you will be testing. 
+
+The sharp-null hypothesis for no treatment effect in this case is that there should be no change in belief (about people from other countries) in the minds of those who attended Hajj (won the Hajj lottery) as compared to those who did not attend Hajj.
+
+To explain further, we have measured the belief of those who attended Hajj vs. those who did not. Therefore here we have two unrelated (i.e., independent or unpaired) groups of samples (attended Hajj vs. not attended Hajj). Therefore, it’s possible to use an independent t-test to evaluate whether the means (of their beliefs) are different. We can represent this null hypothesis as `H0:mA = mB` where `mA = belief of those attended Hajj` and `mB = beliefs of those not attended Hajj`. 
+
+
+##### 2. Using `data.table`, group the data by `success` and report whether views toward others are generally more positive among lottery winners or lottery non-winners. This answer should be of the form `d[ , .(mean_views = ...), keyby = ...]` where you have filled in the `...` with the appropriate functions and varaibles. 
+
+```{r actual hajj ate}
+hajj_group_mean <- d[ , .(mean_views = mean(views)), keyby = .(success)]  
+hajj_ate        <- hajj_group_mean[ , mean(mean_views), keyby = .(success)][ , diff(V1)]
+
+hajj_group_mean
+```
+
+Here we conduct the calculations required in the problem statement and find estimated ATE to be `r hajj_ate`. The class type of `hajj_ate` is `r class(hajj_ate)`.
+
+
+But is this a "meaningful" difference? Or, could a difference of this size have arisen from an "unlucky" randomization? Conduct 10,000 simulated random assignments under the sharp null hypothesis to find out. (Don't just copy the code from the async, think about how to write this yourself.) 
+
+```{r hajj randomization inference}
+# We first create a randomize function to return a vector that randomly returns 0s and 1s. 
+# This will be used to distort the treatment effect column in the original dataset and 
+# thus create the randomized control trials between treatments and control groups.
+randomize <- function(units_per_group) { 
+  assignment_vector <- rep(c(0, 1), each = units_per_group)
+  sample(assignment_vector)
+} 
+
+# Here we are simply allocating treatment and control in a totally random manner to members of the sample. 
+# By doing so, we ignore the initial lable of treatment and control, 
+# and create our own labels. Those are then used to calculate 
+# new group means and new estimated treatment effect.
+ri <- function(rand_num, simulations=10000) {
+  res <- NA   
+  for(sim in 1:simulations) { 
+    res[sim] <- d[ , .(group_mean = mean(views)), keyby = .(randomize(rand_num))][ , diff(group_mean)]
+  }
+  return(res)
+}
+```
+
+
+```{r}
+hajj_ri_distribution <- ri(d[,.N]/2)
+```
+
+We have now performed our randomized inference trials on the given dataset. The length of the new RI distribution vector returned is `r length(hajj_ri_distribution)` (which is equal to the number of simulation we ran).
+
+
+##### 3. How many of the simulated random assignments generate an estimated ATE that is at least as large as the actual estimate of the ATE? Conduct your work in the code chunk below, saving the results into `hajj_count_larger`, but also support your coding with a narrative description. In that narrative description (and throughout), use R's "inline code chunks" to write your answer consistent with each time your run your code.  
+
+```{r hajj one-tailed count}
+hajj_count_larger <- sum(hajj_ri_distribution > hajj_ate)
+```
+`hajj_count_larger` variable calculates to be `r hajj_count_larger`.
+
+There are only `r hajj_count_larger` instances where simulated random assignments generate an estimated ATE that is at least as large as the actual estimate of the ATE (thus we see that the number of simulated random assignments that generate an estimated ATE that is at least as large as the actual estimate of the ATE is a very small number).
+
+
+##### 4. If there are `hajj_count_larger` randomizations that are larger than `hajj_ate`, what is the implied *one-tailed* p-value? Both write the code in the following chunk, and include a narrative description of the result following your code.
+
+```{r hajj one-tailed p-value}
+
+hajj_one_tailed_p_value <- mean(hajj_ri_distribution > hajj_ate) #'fill this in' # length 1 numeric vector 
+
+```
+As calculated above, the `hajj_one_tailed_p_value` variable shows the one-tailed p-value to be `r hajj_one_tailed_p_value`.
+
+
+Essentially, with a one-tailed p-value of we are assuming a hypothesis about the direction of an effect -- whereby we wish to maximize our ability to detect the improvement due to Hajj (i.e. we are confident that taking Hajj will improve the perception about folks from other countries). However, we run a risk of not detecting the opposite side of the effect here (i.e. going for a Hajj could also significantly reduce the perception about people from other countries).
+
+Here the question being posed is whar is probability of observing a treatment effect greater (in absolute scale) than what was observed, given that the sharp-null hypothesis were true?
+
+In this instance however, we get a one tailed p-value of `r hajj_one_tailed_p_value`.
+
+5. Now, conduct a similar test, but for a two-sided p-value. You can either use two tests, one for larger than and another for smaller than; or, you can use an absolute value (`abs`). Both write the code in the following chunk, and include a narrative description of the result following your code. 
+
+```{r hajj two-tailed p-value}
+
+hajj_two_tailed_p_value <- mean(abs(hajj_ri_distribution) > abs(hajj_ate))
+
+```
+ 
+We get a two-tailed p-value of `r hajj_two_tailed_p_value` here. This implies that if the sharp null hypothesis were true, then it would be possible to see a treatment effect larger than that generated in our experiment in more than 0.3% of the possible randomization vectors. 
+
+Now, given that 0.3% is much smaller than the universally accepted 5% significant p-value, we can safely assume that it is extremely rare for us to observe a treatment effect at least as large as the estimated treatment effect. Therefore, we reject the sharp-null hypothesis of no treatment effect (i.e. a no-change in belief about others as a result of attending the Hajj)
+

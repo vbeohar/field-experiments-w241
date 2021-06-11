@@ -1,0 +1,195 @@
+
+# 1. Replicate Results 
+
+Skim [Broockman and Green's](./readings/brookman_green_ps3.pdf) paper on the effects of Facebook ads and download an anonymized version of the data for Facebook users only.
+
+```{r}
+d <- fread("../data/broockman_green_anon_pooled_fb_users_only.csv")
+
+``` 
+
+```{r}
+# To calculate linear model
+calculate_lm <- function(d, study){
+    return(d[ studyno == study, lm(name_recall ~ treat_ad )])
+}
+
+# To calculate and return confidence interval for treatment variable
+calculate_conf_int <- function(mod){
+  return(coefci(mod, vcov. = vcovHC)[2,] * 100)
+}
+
+# To calculate and return robust std errors
+robust_se <- function(mod){
+  # Adjust standard errors
+  cov1  <- vcovHC(mod, type = "HC1")
+  return(sqrt(diag(cov1)))
+}
+
+# To calculate and return clustered std errors
+clustered_se <- function(mod, study=NULL){
+  mod$vcovCL_ <- NULL
+  if (is.null(study)){
+    mod$vcovCL_ <- vcovCL(mod, cluster = d[, cluster])  
+  }else{
+    mod$vcovCL_ <- vcovCL(mod, cluster = d[studyno == study, cluster])  
+  }
+  return(sqrt(diag(mod$vcovCL_)))
+}
+
+# Function to convert coeftest results object to data frame
+# using approach adopted from https://stackoverflow.com/questions/35341821/extracting
+#                 -significance-score-from-aer-coeftest-results-in-r
+coeftest_to_df <- function(x){
+  rt=list()                             # generate empty results list
+  for(c in 1:dim(x)[2]) rt[[c]]=x[,c]   # writes column values of x to list
+  rt=as.data.frame(rt)                  # converts list to data frame object
+  names(rt)=names(x[1,])                # assign correct column names
+  names(rt)[4]<-paste("p_value")
+  rt[,"sig"]=symnum(rt$p_value, corr = FALSE, 
+                    na = FALSE,cutpoints = 
+                      c(0, 0.001, 0.01, 0.05, 0.1, 1),
+                      symbols = c("***", "**", "*", ".", " "))
+  return(rt)
+}
+
+```
+
+
+1. Using regression without clustered standard errors (that is, ignoring the clustered assignment), compute a confidence interval for the effect of the ad on candidate name recognition in Study 1 only (the dependent variable is `name_recall`). After you estimate your model, write a narrative description about what you've learned. 
+
+  - **Note**: Ignore the blocking the article mentions throughout this problem.
+  - **Note**: You will estimate something different than is reported in the study. 
+
+```{r estimate lm}
+
+mod_study1 <- calculate_lm(d, study = 1)
+mod_study1$vcovHC_ <- vcovHC(mod_study1)
+
+calculate_conf_int(mod_study1)
+summary(mod_study1) #display t-test and summary
+
+```
+
+> Just looking at the treatment variable `treat_ad` for study 1, the `namerecall` dependent variable is not explained by the treatment. It appears that the ads had little or no effect on candidate name recognition. This is evident by the p-value of `r coeftest(mod_study1, vcov. = mod_study1$vcovHC_)[2, 4]` which indicates that the treatment effect is not statistically significant. The standard errors are robust standard errors (and not clustered).
+
+> Also note that the adjusted R2 is negative here which is indicating that the chosen model fits worse than a horizontal line. This is indicating that the chosen model does not follow the trend of the data, so it fits worse than a horizontal line.
+
+2. What are the clusters in Broockman and Green's study? Why might taking clustering into account increase the standard errors?
+
+> The study is clustered on demographic groupings of individuals. Taking clustering into account penalizes the model and increases the standard errors, beause uncertainty at the clustered level must be taken into account in the standard errors also. Hence we see an increases in the clustered standard errors. 
+
+3. Estimate a regression that estimates the effect of the ad on candidate name recognition in Study 1, but this time take take clustering into account when you compute the standard errors. 
+  - The estimation of the *model* does not change, only the estimation of the standard errors. 
+  - You can estimate these clustered standard errors using `sandwich::vcovCL`, which means: "The `vcovCL` function from the `sandwich` package. 
+  - We talk about this more in code that is availbe in the course repo.
+
+```{r estimate study 1 lm with clustered SEs}
+
+mod_study1 <- calculate_lm(d, study = 1) 
+clustered_se(mod_study1, study=1)
+
+```
+
+4. Change the context: estimate the treatment effect in Study 2, using clustered standard errors. If you've written your code for part 3 carefully, you should be able to simply change the row-scoping that you're calling. If you didn't write it carefully, for legibility for your colleagues, you might consider re-writting your solution to the last question. Descriptively, do the treatment effects look different between the two studies? Are you able to conduct a formal test by comparing these coefficients? Why, or why not?  
+
+```{r estimate study 2 lm with clustered SEs}
+mod_study2 <- calculate_lm(d, study = 2) 
+clustered_se(study=2, mod_study2)
+
+stargazer(
+  mod_study1,
+  mod_study2,
+  type = 'text',
+  se=list(clustered_se(mod_study1, 1), clustered_se(mod_study2, 2)),
+  header=F
+  )
+
+```
+
+> We present stargazer summary here to show the treatment coefficients for both studies using clustered standard errors. However, this is not a test and only presents results of two completely different studies. In order to test to compare coefficients, even though they are different studies and different contexts -- we can run a test by creating a model with interaction terms with respect to the treatment variable and and using the difference in difference effects between study 1 and study 2 to compare these coefficients. 
+
+5. Run a regression to test for the effect of the ad on candidate name recognition, but this time use the entire sample from both studies -- do not take into account which study the data is from (more on this in a moment), but just "pool" the data. 
+  - Does this estimate tell you anything useful? 
+  - Why or why not? 
+  - Can you say that the treatment assignment procedure used is fully random when you estimate this model? Or is there some endogeneous process that could be confounding your estimate? 
+
+```{r estimate a lm ignoring the study indicator}
+
+mod_pooled <- d[, lm(name_recall ~ treat_ad)]
+mod_pooled$vcovCL_ <- vcovCL(mod_pooled, cluster = d[, cluster])
+coefci(mod_pooled, vcov = mod_pooled$vcovCL_)
+clustered_se(mod_pooled)
+
+model_metrics_df <- coeftest_to_df(coeftest(mod_pooled, mod_pooled$vcovCL1_))
+model_metrics_df
+
+```
+
+> The intercept and treatment effect are statistically significant, but we cannot rely on these results. Hence these are not useful for interpretation. 
+
+> The reason why the estimates of coefficients are not useful here is because the way this linear regression test has been written is incorrect and not considering various differences in both studies. 
+
+> There is a difference in context to how data was collected for studies 1 and 2. For example, study 1 was conducted for name recognition of a relatively unknown candidate, while study 2 was for a well-known candidate. Study 1 was conducted at the town level, however, study 2 was conducted at the county level (which can have very wide differences from economic and political standpoints). 
+
+> Furthermore, there is a major timing difference between these studies (since study 1 took place a month before the election versus study 2 was undertaken a week before the election). As such this could violate the inference and excludability requirements of running linear models. 
+
+> From a non-interference perpective, combining data of two relatively dissimilar but different studies, in a single test violates randomization and non-interference requirement. We can imagine a group of 24-year olds hanging out in local bars and talking about local politics, thus influencing each other's responses in the studies. The timing component mentioned above (with study 1 being conducted a month before election and study 2 being conducted a week before election), also poses spillover and inference problems, 
+
+6. Estimate a model that uses all the data, but this time include a variable that identifies whether an observation was generated during Study 1 or Study 2. 
+  - What is estimated in the "Study 2 Fixed Effect"? 
+  - What is the treatment effect estimate and associated p-value? 
+  - Think a little bit more about the treatment effect that you've estimated: Can this treatment effect, as you've entered it in the model be *different* between Study 1 and Study 2? 
+  - Why or why not? 
+
+```{r}
+mod_fe <- d[, lm(name_recall ~ treat_ad + as.factor(studyno))]
+model_metrics_df <- coeftest_to_df(coeftest(mod_fe, mod_fe$vcovCL1_))
+
+model_metrics_df
+
+stargazer(
+  mod_fe,
+  type = 'text',
+  se=list(clustered_se(mod_fe)),
+  header=F
+)
+```
+
+> The study 2 fixed effects are estimating the time-invariant un-observable factors related to study 2. Including the study fixed effects is helping us remove omitted variable bias and account for within-group variation over time. Across-group variation is not used to estimate the regression coefficients, because this variation might reflect omitted variable bias. 
+
+
+      * study 2 fixed effect estimate and p-value: `r model_metrics_df$Estimate[3]` and `r model_metrics_df$p_value[3]`
+      * treatment effect estimate and p-value: `r model_metrics_df$Estimate[2]` and `r model_metrics_df$p_value[2]`
+
+> The treatment effect can be different between study 1 and 2 due to hetergeneous treatment effects and different inteactions of the treatment variable with both studies. Note that we DO NOT have an interaction term in our model here; and considering the fixed effects solely without accounting for their heterogeneous interaction with the treatment variable. The proper and correct way to use the fixed effects in this case would be to measure the difference in difference estimate between study 2 vs study 1 (study 1 being baseline) using an interaction term with the treatment effect. 
+
+
+
+
+
+7. Estimate a model that lets the treatment effects be different between Study 1 and Study 2. With this model, conduct a formal test -- it must have a p-value associated with the test -- for whether the treatment effects are different in Study 1 than Study 2. 
+
+```{r}
+
+mod_interaction <- d[, lm(name_recall ~ treat_ad + as.factor(studyno) + 
+                            (as.factor(studyno) * treat_ad))] 
+
+# calculating model coeftest metrics to be displayed as a dataframe
+model_metrics_df <- coeftest_to_df(coeftest(mod_interaction, 
+                                            mod_interaction$vcovCL1_))
+model_metrics_df
+
+# showing final results for interaction model
+stargazer(
+  mod_interaction,
+  type = 'text',
+  se=list(clustered_se(mod_interaction)),
+  header=F
+)
+
+```
+> We create a linear model with interaction term between study 2 fixed effects with the treatment variable. This indicates the difference of how much the treatment varies for study 2 over study 1. 
+
+> However, we see the p-value of this HTE (using clustered standard errors for the model) as `r model_metrics_df$p_value[4]` which doesn't indicate a statistically significant heterogeneous treatment effect. 
+

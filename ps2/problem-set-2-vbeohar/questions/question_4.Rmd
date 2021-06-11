@@ -1,0 +1,128 @@
+# Power Analysis 
+
+Understanding whether your experiment design and data collection strategy are able to reject the null hypothesis *when they should* is valuable! And, this isn't theoretical value. If your design and data collection cannot reject the null hypothesis, why even run the experiment in the first place?
+
+The classical formulation of power asks, "Given a test procedure and data, what proportion of the tests I *could conduct* would reject the null hypothesis?" 
+
+Imagine that you and David Reiley are going to revive the sports card experiment from the previous question. However, because it is for a class project, and because you've already spent all your money on a shiny new data science degree :raised_hands: :money_with_wings: , you're not going to be able to afford to recruit as many participants as before. 
+
+##### 1. Describe a t-test based testing procedure that you might conduct for this experiment. What is your null hypothesis, and what would it take for you to reject this null hypothesis? (This second statement could either be in terms of p-values, or critical values.)
+
+Given that we our data here meets assumptions for t-test (i.e. scale of measurement applied to the data collected follows a continuous or ordinal scale, the data is collected from a representative, randomly selected portion of the total population and when plotted it follows a normal distribution with homogeneity of variances), we use an unpaired two-samples t-test (which is usually used to compare the mean of two independent groups). 
+
+Here we could state our null hypothesis as `H0 : mA = mB` where `mA = mean of the price bids of the treatment auction format` and `mB = mean of the price bids of the control auction format` 
+
+We would reject the null hypothesis if we find a p-value which is lower than `5% critical value` or `under the 0.05 standard of statistical significance`. Rejecting the null hypothesis would then mean that we have found evidence that the treatment auction format does produce a difference bid price than the control auction format. 
+
+
+##### 2. Suppose that you are only able to recruit 10 people to be a part of your experiment -- 5 in treatment and another 5 in control. Simulate "re-conducting" the sports card experiment once by sampling from the data you previously collected, and conducting the test that you've written down in part 1 above. Given the results of this 10 person simulation, would your test reject the null hypothesis?
+
+```{r}
+library(data.table)
+library(ggplot2)
+
+# load data and calculate estimate of ATE
+d <- fread('../data/list_data_2019.csv')
+bid_ate     <- d[ , .(mean_views = mean(bid)), keyby = .(uniform_price_auction)][, diff(mean_views)]
+
+```
+
+First we load the data and also calculate our estimate of average treatment effect (a.k.a our test statistic) under the sharp null hypothesis that the treatment auction format produces no different bids than the control auction format. Our estimated average treatment effect is `r bid_ate`.
+
+
+```{r}
+t_test_gen <- function(dt, treat_control_size, REPL_FLAG) {
+  # This function takes three arguments: (1) dataframe (2) half of sample size for which to run t-tes and 
+  # (3) replacement (yes/no) flag. Sample size is half of the size for which we want to run erxperiment. 
+  # Because we allocate equal numbers to treatment and control groups. Replacement flag tells whether we want to 
+  # randomly sample with replacement or without. For example, if your sample size chosen is larger than the 
+  # actual experimental sample, then you should pass replacement flag as TRUE
+  
+  return(try(t.test(
+                  sample(dt[uniform_price_auction==1, (bid)], treat_control_size, replace=REPL_FLAG),
+                  sample(dt[uniform_price_auction==0, (bid)], treat_control_size, replace=REPL_FLAG)
+                )$p.value
+         ))
+}
+
+```
+
+
+```{r ten person sample}
+
+t_test_ten_people <- t_test_gen(d, 5, FALSE)
+
+```
+
+For our 10 person simulation above, we have created a generic function that takes as inputs the dataframe copy on which to randomize, the number of subjects for which we have to randomize, a boolean flag that indicates whether we want to randomize with or without replacement.
+
+The randomization with or without replacement is an important point here. If we randomize without replacement (as long as the number of samples for randomization is smaller than the total sample size), there is more likelihood that we are picking outliers. In which case, the probability of finding values closer to the estimated expected test statistic (expected value of ATE) goes down. If we run a t-test with replacement, our probability of finding values closer to the expected test statistic are higher (which then leads to a higher power).
+
+In our case above, when we run our t-test without replacement, our p-values are USUALLY large enough at `r t_test_ten_people` that we fail to reject the null hypothesis.
+
+##### 3. Now, repeat this process -- sampling 10 people from your existing data and conducting the appropriate test -- one-thousand times. Each time that you conduct this sample and test, pull the p-value from your t-test and store it in an object for later use. Consider whether your sampling process should sample with or without replacement.
+
+
+```{r many ten person samples}
+t_test_p_values <- replicate(1000, t_test_gen(d, 5, FALSE)) # fill this in with the p-values from your power analysis
+```
+
+As mentioned above, because we are only using data for 10 subjects at a time, we can run our t-test randomized without replacement (since the total sample size is larger than 10).
+
+
+##### 4. Use `ggplot` and either `geom_hist()` or `geom_density()` to produce a distribution of your p-values, and describe what you see. What impression does this leave you with about the power of your test? 
+
+```{r histogram of ten person samples}
+ggplot(as.data.frame(t_test_p_values), aes(x=t_test_p_values)) +
+  geom_histogram(color="darkblue", fill="lightblue", binwidth = 0.01)
+  
+t_test_p_values_power <- mean(t_test_p_values < 0.05)
+
+```
+
+After having run the randomization t-tests (without replacement), we see that the distribution of p-values is much flatter than what we would ideally want in order to have a high power (more confidence in being able to reject our null hypothesis). As seen above from the histogram distribution of p-values, we see that roughly `15%` of p-values are (`r t_test_p_values_power` to be precise) are below the 0.05 critical value threshold. Ideally, we would have wanted a much larger percentage of p-values to be under the `0.05` value (we would have wanted to distribution to be very heavily right skewed) for a higher power. 
+
+##### 5. Suppose that you and David were to actually run this experiment and design -- sample 10 people, conduct a t-test, and draw a conclusion. **And** suppose that when you get the data back, **lo and behold** it happens to reject the null hypothesis. Given the power that your design possesses, does the result seem reliable? Or, does it seem like it might be a false-positive result?
+
+As mentioned above, the power we get is `r t_test_p_values_power` only. This is not ideal. We would want the power to be at least `80%` to be reliable (remember power is the ability to correctly reject the null hypothesis).
+
+6. Apply the decision rule that you wrote down in part 1 above to each of the simulations you have conducted. What proportion of your simulations have rejected your null hypothesis? This is the p-value that this design and testing procedure generates. After you write and execute your code, include a narrative sentence or two about what you see.  
+
+```{r ten-person power}
+
+# find out how many p values are less than 0.05
+t_test_rejects <- sum(t_test_p_values < 0.05)
+
+```
+
+We see that `r t_test_rejects` p-values are less than the important threshold `0.05 standard of statistical significance`. This means that the p-value of our test is `r t_test_rejects/1000` which is not sufficient to reject the null hypothesis.
+
+##### 7. Does buying more sample increase the power of your test? Apply the algorithm you have just written onto different sizes of data. Namely, conduct the exact same process that you have for 10 people, but now conduct the process for every 10% of recruitment size of the original data: Conduct a power analysis with a 10%, 20%, 30%, ... 200% sample of the original data. (You could be more granular if you like, perhaps running this task for every 1% of the data). 
+
+```{r} 
+percentages_to_sample <- 0.1
+counter <- 1
+samplesize <- NA
+power_analysis <- NA
+
+while (percentages_to_sample < 2.1) {
+  samplesize[counter] <- percentages_to_sample * nrow(d)
+  p_vals <- replicate(1000, t_test_gen(d, samplesize[counter]/2, TRUE))
+  power_analysis[counter] <- mean(p_vals < 0.05)
+  cat(sprintf('Sample size: %.2f, Power: %.3f\n', samplesize[counter], power_analysis[counter]))
+  percentages_to_sample <- percentages_to_sample + 0.1
+  counter <- counter + 1
+}
+
+plot(x = samplesize, y = power_analysis, type = 'l')
+
+```
+
+Here we conduct the simulation, scaling from 10% of sample size all the way up to 200% of sample size. We do this WITH REPLACEMENT, because the randomization would extend beyond the sample size.
+
+We observe that as we increase samples in our experiment, the power of the experiment goes up. This is expected from our earlier comments (and more so, more importantly in experiments with replacement) because with more samples the probability of finding observations at least as large as the expected test statistic increase -- which leads to a higher confidence in being able to correctly reject the null hypothesis. 
+
+In other words, here we observe that when you add more people (and add more data) and conduct tests more cleanly (with cleaner measurement systems), your power increases correspondingly.
+
+Additionally the above chart of increasing power with increasing sample size clearly illustrates that sometimes it is difficult to reject the null hypothesis because you have so little statistical power (because you have so few samples). So in order to evaluate a siginificant difference in experiment, you need to have more samples!
+

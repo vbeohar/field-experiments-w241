@@ -1,0 +1,23 @@
+# Potential Outcomes Notation 
+
+1. Explain the notation $Y_i(1)$.\
+
+    **Answer:** \ $Y_i(1)$ is the potential outcome if the ith subject were treated.
+    
+2. Explain the notation $Y_1(1)$.\
+
+    **Answer:** \ $Y_1(1)$ is the potential outcome if the 1st subject were treated.
+    
+3. Explain the notation $E[Y_i(1)|d_i=0]$.\
+
+    **Answer:** \ Expectation of potential outcome if one subject is selected at random from the set of treated subjects. 
+    
+4. Explain the difference between the notation $E[Y_i(1)]$ and $E[Y_i(1)|d_i=1]$ \ 
+
+    **Answer:** \ Expected value of Y_i(1) (i.e. potential outcome if the ith subject were treated) when one subject is sampled at random from all samples. \
+    Expected value of Y_i(1) when one subject is sampled at random from the set of all treated subjects \
+    The latter is a conditional expectation, which refers to subgroup averages. In this case, the difference between both expressions that the former is expected value of potential outcomes of a randomly treated subject, sampled from all possible samples. The latter is expression for expected value of potential outcome of a treated subject sampled only from the set of treated samples.    
+
+
+
+

@@ -1,0 +1,106 @@
+# 3. Sports Cards
+
+In this experiment, the experimenters invited consumers at a sports card trading show to bid against one other bidder for a pair trading cards.  We abstract from the multi-unit-auction details here, and simply state that the treatment auction format was theoretically predicted to produce lower bids than the control auction format.  We provide you a relevant subset of data from the experiment.
+
+In this question, we are asking you to produce p-values and confidence intervals in three different ways: 
+
+1. Using a `t.test`; 
+2. Using a regression; and,
+3. Using randomization inference. 
+
+```{r load cards data }
+library(data.table)
+
+d <- fread('../data/list_data_2019.csv')
+bid_ate <- d[ , .(mean_views = mean(bid)), keyby = .(uniform_price_auction)][, diff(mean_views)]
+
+```
+
+First we load the data and also calculate our estimate of average treatment effect (a.k.a our test statistic) under the sharp null hypothesis that the treatment auction format produces no different bids than the control auction format. Our estimated average treatment effect is `r bid_ate`.
+
+##### 1. Using a `t.test`, compute a 95% confidence interval for the difference between the treatment mean and the control mean. After you conduct your test, write a narrative statement, using inline code evaluation that describes what your tests find, and how you interpret these results. (You should be able to look into `str(t_test_cards)` to find the pieces that you want to pull to include in your written results.) 
+
+```{r cards t-test}
+# t_test_cards <- t.test(bid ~ uniform_price_auction, data = d, paired = FALSE, alternative = "two.sided") # this should be the t.test object. Extract pieces from this object in-text below the code chunk. 
+t_test_cards <- t.test(d[uniform_price_auction==1,bid], d[uniform_price_auction==0,bid])
+
+str(t_test_cards)
+```
+
+Our t-test is based on the hypothesis that bid price for treatment auction format is equal to the control auction format. Therefore, when we conduct a t-test and find a p-value of `r t_test_cards$p.value`, we find that it is significantly smaller than the critical value of 0.05 needed to reject the null hypothesis at 95% confidence interval. Therefore, with this t-test we can reject the null hypothesis that the bid price for treatment auction format is equal to the control auction format.
+
+Furthermore, our t-test calculates a 95% confidence of having the estimate of average treatment effect of `r bid_ate` falling between the range of `r t_test_cards$conf.int[1]` and `r t_test_cards$conf.int[2]` (calculated using formula `r t_test_cards$conf.int[1:2]`)
+
+##### 2. In plain language, what does this confidence interval mean? 
+
+There is 95% probability that the true value of the unknown population parameter (difference between treatment and control mean) will lie within `r t_test_cards$conf.int[1]` and `r t_test_cards$conf.int[2]`
+
+##### 3. Conduct a randomization inference process using an estimator that you write by hand (i.e. in the same way as earlier questions). On the sharp-null distribution that this process creates, compute the 2.5% quantile and the 97.5% quantile using the function `quantile` with the appropriate vector passed to the `probs` argument. After you conduct your test, write a narrative statement of your test results. 
+
+```{r cards randomization inference} 
+ri <- function(dt, rand_num, simulations = 10000) {
+  res <- NA
+  for(sim in 1:simulations) { 
+    res[sim] <- dt[ , .(ri_mean = mean(bid)), keyby = .(sample(rep(c(0, 1), each = rand_num)))][ , diff(ri_mean)]
+  }
+  return(res)
+}
+ri_distribution <- ri(d, d[,.N]/2)     #'fill this in' # numeric vector of length equal to your number of RI permutations
+ri_quantiles    <-  quantile(ri_distribution, probs = c(0.025, 0.975)) 
+```
+Probably a good idea to sow the quantiles output here:
+```{r} 
+ri_quantiles
+```
+
+
+
+We conduct a 10,000 simulated random assignments find out the distribution of the test statistic under the assumption that the sharp-null is true. We find that the confidence interval interval calculated under the random inference simulation falls between `r ri_quantiles[1]` and `r ri_quantiles[2]`.
+
+The reason for different confidence intervals between both approaches is that when you run a t-test or a difference in means test, the uncertainty mapping is distributed around the perimeter you are estimating. On the other hand, when you run a randomization inference test the confidence interval is distributed centered around 0. The distribution shifts by the magnitude of the treatment effect, because the RI hypothesis itelf is centered around zero. However, the confidence interval for a t-test or a regression coefficient is not centered on zero (it is centered on the value you estimated for that statistic).
+
+Which makes sense, because even when the RI based confidence interval has shifted, it does align perfectly with the t-test based confidence interval (when adjusted for the `-12.3` ATE). 
+
+
+Can be confirmed by this formula `RI confidence interval = t-test based confidence interval +/- estimate of ATE `.
+
+
+##### 4. Do you learn anything different if you regress the outcome on a binary treatment variable? To answer this question, regress `bid` on a binary variable equal to 0 for the control auction and 1 for the treatment auction and then calculate the 95% confidence interval using *classical standard errors* (in a moment you will calculate with *robust standard errors*). There are two ways to do this -- you can code them by hand; or use a built-in, `confint`. After you conduct your test, write a narrative statement of your test results. 
+
+```{r cards ols regression}
+mod <- lm(bid ~ uniform_price_auction, data = d)
+
+confint(mod, level=0.95)                        #conf interval using built-in formula
+sum_ols <- summary(mod)$coefficients            #extracting OLS summary in an object
+```
+
+The OLS based confidence interval produces the same values of confidence interval. 
+
+We see here that we are using the formula `confint(mod, level=0.95)` results are: `r confint(mod, level=0.95)`.
+
+
+We then proceed to calculate the confidence interval manually by extracting `coefficients` from the `OLS summary object` using the formula `summary(mod)$coefficients`. 
+
+Here we also see that the results align with our calculations of other approaches for a 95% confidence interval: 
+
+* `sum_ols[2, 1]  + 1.96 * sum_ols[2, 2]` gives a value of `r sum_ols[2, 1]  + 1.96 * sum_ols[2, 2]`
+* `sum_ols[2, 1]  - 1.96 * sum_ols[2, 2]` gives a value of `r sum_ols[2, 1]  - 1.96 * sum_ols[2, 2]`
+
+
+##### 5. Calculate the 95% confidence interval using robust standard errors, using the `sandwich` package. There is a function in `lmtest` called `coefci` that can help with this. It is also possible to do this work by hand. After you conduct your test, write a narrative statement of your test results.
+
+```{r cards robust ci}
+library(sandwich)
+library(lmtest)
+
+m <- lm(bid ~ uniform_price_auction, data = d)
+coefci(m, vcov. = vcovHC(m, type = 'HC0'))
+
+```
+
+With the `sandwich` package, we also see that the robust standard errors come very close to what we had calculated in other prior methods. 
+
+
+##### 6. Characterize what you learn from each of these different methods -- are the results contingent on the method of analysis that you choose? 
+
+We observe, that as noted in part 3 above, there is a shift in confidence interval around `zero` when using a randomization inference based method. However, the overall approach does not lead to any significant difference in test results. 

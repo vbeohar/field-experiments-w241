@@ -1,0 +1,175 @@
+
+# 2. Randomization Inference Practice
+
+Suppose that you've been hired as the data scientist at a quack nootropics company. Despite their fraudulent intent, you're dedicated to doing good data science. Or, at least science as good as you can. 
+
+Their newest serum, *kniht* purports to raise its users' executive function. You think that it is just amphetamines. 
+
+As the data scientist for the company, you convince them to conduct a trial. Great! The good news is this:
+
+- Each person is measured twice.
+- Before one of the measurements, they are given a placebo. Before the other of the measurements they are given *kniht*. 
+- You ask for instrumentation on two concepts: 
+  - Creativity, measured as number of proposed alternative uses of an object. (This is a classic, test of "creativity", proposed by J.P. Guilford. For example, how many things can you propose doing with a camera tripod? )
+  - Physical Arousal, measured through skin conductance (i.e. how sweaty is someone). 
+  
+The bad news is this: The company knows that they're selling nonsense, and they don't want you to be able to prove it. They reason that if they provide you only six test subjects, that you won't be able to prove anything, and that they can hide behind a "fail-to-reject" claim. 
+
+```{r}
+library(data.table)
+
+kniht <- data.table(
+  person  = rep(LETTERS[1:6], each = 4), 
+  treat   = rep(0:1, each = 2), 
+  measure = rep(c('creative', 'sweat'))
+)
+
+
+kniht[measure == 'creative' & treat == 0, 
+      value := c(10, 13, 14, 16, 25, 40)]
+kniht[measure == 'creative' & treat == 1, 
+      value := c(12, 11, 13, 20, 21, 46)]
+kniht[measure == 'sweat' & treat == 0, 
+      value := c(0.4, 0.7, 0.3, 0.8, 1.0, 1.4)]
+kniht[measure == 'sweat' & treat == 1, 
+      value := c(0.4, 0.7, 2.0, 0.9, 1.6, 2.2)]
+```
+
+Conduct the following tests. 
+
+#### 1. Conduct the appropriate t-test that respects the repeated-measures nature of the data (is this a paired or independent samples t-test?) for both the `creative` and the `sweat` outcomes. After you conduct your tests, write a narrative statement about what you conclude. 
+
+```{r creative t-test}
+t_test_creative <- t.test(value ~ treat, data = kniht[measure=='creative'], paired = TRUE) 
+
+```
+
+Calculated a t-test and saved the object in `t_test_creative`. We obtain a p-value using formula `t_test_creative$p.value` and find it's value to be `r t_test_creative$p.value`
+
+```{r sweat t-test}
+t_test_sweat <- t.test(value ~ treat, data = kniht[measure=='sweat'], paired = TRUE) 
+```
+
+Calculated a t-test and saved the object in `t_test_sweat`. We obtain a p-value using formula `t_test_sweat$p.value` and find it's value to be `r t_test_sweat$p.value`
+
+
+This is a paired samples t-test because we are noting pre- and post-treatment effects of *kniht* on the same person. In such situation, we use a paired t-test to compare the mean difference of treatment effects before and after intervention. The hypothesis in this case will be: `H0: m = 0` (where m is the mean of the difference of the before and after treatment effects).
+ 
+As we can see from our respective t-tests, p-value for a hypothesis of no effect of *kniht* on creative abilities is `r t_test_creative$p.value`. Going by the conventional standards of 5% significance, we cannot reject the null hypothesis of no impact of *kniht* on creative abilities. Similarly, the large value of `r t_test_sweat$p.value` also indicates that we fail to reject the null hypothesis of no effect (at 5% critical value) of  *kniht*  on physical arousal on subjects (which is what the specious company really wanted!)
+
+
+
+
+
+#### 2. Conduct the appropriate randomization inference test that respects the repeated-measures nature of the data. After you conduct your tests, write a narrative statement about what you conclude.
+
+```{r}
+randomize <- function(units_per_group) { 
+  assignment_vector <- rep(c(0, 1), each = units_per_group)
+  sample(assignment_vector)
+} 
+
+ri <- function(dt, rand_num = 6, simulations = 10000) {
+  res <- NA
+  for(sim in 1:simulations) { 
+    res[sim] <- dt[ , .(ri_mean = mean(value)), keyby = .(randomize(rand_num))][ , diff(ri_mean)]
+  }
+  return(res)
+}
+```
+
+
+```{r creative ri}
+# Here we calculate the initial test statistic used for the RI process
+creative_ate     <- kniht[ measure=='creative', .(mean_views = mean(value)), keyby = .(treat)][, diff(mean_views)]
+
+# This is the right method of randomization. First we are randomizing on the treatment/control 
+# at a person level. Then we pass that randomized data table to the randomization inference function, 
+# which further randomizes across persons. Thus there are two levels of randomization here. 
+
+# Therefore, in this manner, we are preserving the person-level treatment effect. We first randomize (or distort)
+# the allocation of the initial treatment-control values for each person by using the sample(c(-1,1),1) function 
+# which randomly returens -1 and 1 (that is then multiplies by the treatment effect for each person -- which is 
+# calculated using the group-by at each person level).
+
+# Then we use the RI() function to conduct the randomized experiements across the entire dataset.
+
+kniht_creative <- kniht[ measure=='creative',.(value = diff(value * sample(c(-1,1),1))), by = .(person)] 
+creative_ri    <- ri(kniht_creative, 3)
+
+creative_p_value <- mean(abs(creative_ri) > abs(creative_ate))
+
+creative_p_value
+
+plot(density(creative_ri))
+```
+
+So we we first `group by` at person level. Because we have a paired assignment (we are already given a treatment-control science fiction table). We are therefore assuming that all things have been equal before and after the treatment was given to each person. 
+However, in our randomization experiment, we wish to remove that "treatment-control" order (at the person level) and assign these random treatment-control values to each person, in each iteration. 
+
+
+Here is how the data initially looks like: 
+
++--------+-------+----------+-------+
+| person | treat | measure  | value |
++--------+-------+----------+-------+
+| A      | 0     | creative | 10    |
++--------+-------+----------+-------+
+| A      | 1     | creative | 12    |
++--------+-------+----------+-------+
+| B      | 0     | sweat    | 11    |
++--------+-------+----------+-------+
+| B      | 1     | sweat    | 12    |
++--------+-------+----------+-------+
+
+
+To conduct our experiment, we first wish to group by at person level (by randomly calculating treatments and controls based on the "value" column). Below is one example of how that grouped data might look like.
+
++--------+-------+
+| person | value |
++--------+-------+
+| A      | 2     |
++--------+-------+
+| B      | -2    |
++--------+-------+
+| C      | -1    |
++--------+-------+
+| D      | 4     |
++--------+-------+
+
+
+Later on, we pass this above data table to randomization inference loop repeatedly. Note, that the "value" column might change, based on how the treatment and control assignment had happened at the grouped person level.
+
+Similar work is done for the `sweat` measurement (as below):
+
+
+```{r sweat ri}
+sweat_ate     <- kniht[ measure=='sweat', .(mean_views = mean(value)), keyby = .(treat)][, diff(mean_views)]
+kniht_sweat <- kniht[ measure=='sweat',.(value = diff(value * sample(c(-1,1),1))), by = .(person)] 
+sweat_ri      <- ri(kniht_sweat, 3)
+
+sweat_p_value <- mean(abs(sweat_ri) > abs(sweat_ate))
+
+plot(density(sweat_ri))
+```
+
+The randomization inference is based on the sharp null effect of no effect (which means that it does not matter whether a person takes a placebo or *kniht* drug). The sharp null is hypothesizing that there should be no treatment effect (even if the order is changed) given the placebo and treatment on every single person in the trial.
+
+To summarize finally, the estimated average treatment effects are and `r creative_ate` and `r sweat_ate` for `creative abilities` and `sweatiness measure` respectively. Correspondingly, the p-values for randomization inference tests for both the `creative` and the `sweat` outcomes are `r creative_p_value` and `r sweat_p_value` respectively. We therefore fail to reject the sharp null hypothesis under the 0.05 standard of statistical significance in this case. 
+
+
+
+
+#### 3. Which of these tests are more appropriate to the task at hand, and why? Based on the tests that you have run, what do you conclude about the effectiveness of *kniht*? 
+
+In this instance we only have data for 6 people, which to say the least, is highly insufficient, let alone normally distributed. 
+
+The conventional t-tests rely on various assumptions, such as data, when plotted, should result in a normal distribution. We also dont find most of the other assumptions under t-tests not being held here (such as the scale of measurement, simple random samples, normal distribution, reasonably large sample size and homogeneity of variance).  
+
+[Gerber and Green](https://stats.stackexchange.com/questions/287407/t-test-p-value-vs-randomization-inference-p-value-what-can-we-learn-from-compar) also talks about the limitation of t-tests in similar instances of small sample size and skewness of data. 
+
+Hence the steep difference in p-values between the randomization inference and the conventional t-test methods (they would be close if the sample size was large enough). 
+
+Therefore, in this case using a randomization inference based p-value does make sense (because the approach is not limited to small samples or normally distributed outcomes). 
+
+Finally, given the large p-values using the RI  `r creative_p_value` and `r sweat_p_value`, we fail to reject the sharp null hypothesis of no treatment effect of *kniht* under the 0.05 standard of statistical significance (if we were to reject the sharp null hypothesis, that would have meant that the *kniht* drug was in fact effective!).

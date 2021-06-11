@@ -1,0 +1,28 @@
+---
+title: "Problem Set 2"
+author: "Alex, Micah, and Scott"
+date: "12/07/2020"
+output: github_document
+---
+
+
+```{r package loads, warning=FALSE, message=FALSE}
+library(data.table)
+library(sandwich)
+library(lmtest)
+
+library(ggplot2)
+library(knitr)
+```
+
+```{r, child='./questions/question_1.Rmd'}
+```
+
+```{r, child='./questions/question_2.Rmd'}
+```
+
+```{r, child='./questions/question_3.Rmd'}
+```
+
+```{r, child='./questions/question_4.Rmd'}
+```

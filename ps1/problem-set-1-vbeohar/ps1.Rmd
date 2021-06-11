@@ -1,0 +1,29 @@
+---
+title: "Problem Set 1"
+author: "Alex, Micah, and Scott"
+date: "12/01/2020"
+output: github_document
+---
+
+```{r setup, warning=FALSE}
+library(data.table)
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, child='questions/question_1.Rmd'}
+```
+
+```{r, child='questions/question_2.Rmd'}
+```
+
+```{r, child='questions/question_3.Rmd'}
+```
+
+```{r, child='questions/question_4.Rmd'}
+```
+
+```{r, child='questions/question_5.Rmd'}
+```
+
+

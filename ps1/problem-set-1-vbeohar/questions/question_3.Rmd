@@ -1,0 +1,111 @@
+# Visual Acuity 
+
+Suppose we are interested in the hypothesis that children playing outside leads them to have better eyesight.
+
+Consider the following population of ten children whose visual acuity we can measure. 
+
+- Visual acuity is the decimal version of the fraction given as output in standard eye exams. 
+- Someone with 20/20 vision has acuity 1.0, while someone with 20/40 vision has acuity 0.5. 
+- Numbers greater than 1.0 are possible for people with better than “normal” visual acuity.
+
+```{r make visual data}
+library(data.table)
+
+d <- data.table(
+  child = 1:10, 
+  y_0 = c(1.2, 0.1, 0.5, 0.8, 1.5, 2.0, 1.3, 0.7, 1.1, 1.4), 
+  y_1 = c(1.2, 0.7, 0.5, 0.8, 0.6, 2.0, 1.3, 0.7, 1.1, 1.4)
+)
+
+```
+
+In this table: 
+
+- `y_1` means means the measured *visual acuity* if the child were to play outside at least 10 hours per week from ages 3 to 6'  
+- `y_0` means the measured *visual acuity* if the child were to play outside fewer than 10 hours per week from age 3 to age 6; 
+- Both of these potential outcomes *at the child level* would be measured at the same time, when the child is 6. 
+
+1. Compute the individual treatment effect for each of the ten children.
+
+```{r}
+
+d[, tau:= (y_1 - y_0)]
+d
+hist(d$tau)
+```
+
+
+2. Tell a "story" that could explain this distribution of treatment effects. In particular, discuss what might cause some children to have different treatment effects than others. \
+
+    **Answer:** \ We see only two children have different treatment effects in this observation set (2nd and 5th kids) while the treatment effects for remaining children is zero. Moreover, we see that treatment effects for 2nd and 5th kids are opposite. Hence we cannot infer any meaningful causal effect from this observational study. There could be number of reasons why the two children have different treatment effects (i.e. congenital vision defects, acquired vision acuity conditions owing to diets due to income differences between both households etc). Hence we are not able to create a definitive story because a number of confounding factors need to be eliminated first (which may require a much bigger sample size and a much better level of experimental intervention for a meaningful study).
+
+3. For this population, what is the true average treatment effect (ATE) of playing outside.
+
+```{r}
+
+mean(d$tau)
+
+```
+
+4. Suppose we are able to do an experiment in which we can control the amount of time that these children play outside for three years. We happen to randomly assign the odd-numbered children to treatment and the even-numbered children to control. What is the estimate of the ATE you would reach under this assignment? (Please describe your work.) \
+
+    **Answer:** \We first divide the children into subgroups (odd and even numbered kids) and create an additional column called `treat` which marks `0` for even numbered kids and `1` for odd numbered kids. \
+    Then we also create an additional column to store the potential outcomes for treatment and control groups (similar to how we divided kids as treatment and control groups in first step). \
+    We now simply calculate the ATE using condition on `treat` column (marking children as control and treatment) and the value stored in `Y` columns.
+
+```{r}
+d[, treat := ifelse(test = (child %% 2 == 0), yes = 0, no = 1)]
+d[, Y := ifelse(test = (child %% 2 == 0), yes = y_0, no = y_1)]
+d[treat ==1, mean(Y)] - d[treat ==0, mean(Y)]
+
+```
+
+
+
+5. How different is the estimate from the truth? Intuitively, why is there a difference? \
+    
+    **Answer:** \ The difference in the estimated ATE from splitting children in odd-numbered and even-numbered treatment and control groups is 100% more different from the true ATE. This is because of 2nd and 5th children that are present in the different subgroups. Whereas, in the overall hypothetical true ATE their potential outcomes were both included equally; in the odd-even treatment and control groups, these children were present in different groups leading to a difference in estimated ATE from the true ATE.    
+
+
+6. We just considered one way (odd-even) an experiment might split the children. How many different ways (every possible ways) are there to split the children into a treatment versus a control group (assuming at least one person is always in the treatment group and at least one person is always in the control group)? \
+
+    **Answer:** \ The question is asking us to create possible ways of creating randomized groups of treatments and control --  with a caveat that each group SHOULD HAVE at least 1 student each. \
+    That means, we cannot assign all 10 kids to either control or treatment groups. However, we can have scenarios where either control or treatment groups could have 9 kids (with the remaining 1 kid being assigned to the other unit). \
+
+    Combination theory says that number of ways creating groups of k students from n students is nCr. Therefore: \
+
+    ```
+    * How many groups of 1 students can you create from 10 students: 10
+    * How many groups of 2 students can you create from 10 students: 45
+    * How many groups of 3 students can you create from 10 students: 120
+    * How many groups of 4 students can you create from 10 students: 210
+    * How many groups of 5 students can you create from 10 students: 252
+    * How many groups of 6 students can you create from 10 students: 210
+    * How many groups of 7 students can you create from 10 students: 120
+    * How many groups of 8 students can you create from 10 students: 45
+    * How many groups of 9 students can you create from 10 students: 10
+    ```
+    \   
+    
+    The total number of combinations is therefore: 1022 \
+
+    The following formula for combination can be used also (to save time and for conciseness), with a vector notation and `sum()` to calculate the results in one line as: \
+```{r}
+sum(choose(n=10, k=1:9))
+```
+
+
+7. Suppose that we decide it is too hard to control the behavior of the children, so we do an observational study instead. Children 1-5 choose to play an average of more than 10 hours per week from age 3 to age 6, while Children 6-10 play less than 10 hours per week. Compute the difference in means from the resulting observational data.
+
+
+```{r}
+d[child %in% 1:5, mean(y_1)] - d[child %in% 6:10, mean(y_0)]
+d
+```
+
+
+8. Compare your answer in (7) to the true ATE. Intuitively, what causes the difference? \
+
+    **Answer:** \ In the true ATE calculation, the 2nd and 5th children are both swaying the ATE in opposite directions (because of them being present in hypothetical treatment and control groups). Therefore, their expected potential outcomes are impacting the final ATE in offsetting directions. \ However, in current approach, only 50% of the children are present in treatment and control groups. Therefore the expected values of potential outcomes are very differently impacted from the treatment and control groups here. \ Moreover, the sample is too small to make meaningful judgments and conclusion. In this step, we are only taking sample of 5 children (vs. 10 children in the true ATE calculation). 
+
+
